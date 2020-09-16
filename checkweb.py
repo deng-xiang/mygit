@@ -1,12 +1,30 @@
 import requests
 import openpyxl
-
+import time
+import re
 from bs4 import BeautifulSoup
 from openpyxl.styles import PatternFill, Border, Side, Font, Alignment
 
+
+
 def check(rul):
+    headers = {
+
+        'Accept': '*/*',
+        'Accept-Encoding': 'gzip, deflate',
+        'Connection': 'close',
+        'Host': 'httpbin.org',
+        'referer': 'https://xiaoyuan.lagou.com/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.221 Safari/537.36 SE 2.X MetaSr 1.0',
+
+    }
     try:
-        code=requests.get(rul).status_code
+        tmpstr=rul.replace('http://','')
+
+        #print(re.sub(r'/$','',tmpstr))
+        headers['Host']=re.sub(r'/$','',tmpstr)
+        print(headers['Host'])
+        code=requests.get(rul,headers=headers,timeout=2).status_code
     except Exception as err:
         err='异常'
         return  err
@@ -34,6 +52,19 @@ def initweb(qurl,aurl,wbook,sheetname):
     #print (r.text)
 
     soup = BeautifulSoup(r.text, 'html.parser')
+    print(qurl)
+    if 'http://www.glswxgj.gov.cn/' in qurl:
+    #网址是否能访问
+        webadress= soup.find('div', attrs={'id':'tipinfo'})
+        print(webadress)
+        webadress=webadress.find('div', attrs={'class': 'col-red lh30 fz14'})
+        print(webadress)
+        print('==========')
+        if '获取不到' in webadress.string:
+            print('网址不可访问')
+            return False
+
+
     # 网站标题
 
     url = soup.find('div', attrs={'class': 'ball color-63'})
@@ -68,7 +99,13 @@ def initweb(qurl,aurl,wbook,sheetname):
     IP = IP.find('div', attrs={'class': 'pb5'})
     IP = IP.find('span')
     IP = IP.find('i')
+
     IP = IP.find('a')
+    if IP == None:
+        print("网站无法获取IP")
+        return False
+
+
     ip1 = IP.string.split('[')[0]
     addr = IP.string.split('[')[1].replace(']', '')
     #print("IP:" + ip1)
@@ -76,8 +113,13 @@ def initweb(qurl,aurl,wbook,sheetname):
     #print("物理位置:" + addr)
     ws['B3'].value=addr
 
+
+
+
+
     # 服务器类型
     try:
+
         machinetype = soup.find('div',attrs={'class':'Manin01List03 clearfix _chinaz-seo-new11'})
         #print(machinetype)
         machinetype = machinetype.find('ul', attrs={'class': 'MaLi03List fl'})
@@ -87,7 +129,7 @@ def initweb(qurl,aurl,wbook,sheetname):
         if '-' in machinetype[2].string:
             ws['B6'].value='未检测到'
         else:
-            ws['B6'].value=machinetype[2].string
+            ws['B6'].value=machinetype[2].string.strip()
     except Exception as err:
         ws['B6'].value='未检测到'
     # ALEXA世界排名
@@ -115,11 +157,32 @@ wt=openpyxl.Workbook()
 for row in range(2,sheet.max_row+1):
     checkurl=sheet['C'+str(row)].value
     #sheet['D'+str(row)].value=check( checkurl )
+    #time.sleep(10)
     print(str(sheet['B'+str(row)].value) +':'+ str(sheet['D'+str(row)].value) )
-    if str(sheet['D'+str(row)].value)=='200':
+    #if str(sheet['D'+str(row)].value)=='200':
+    initweb(checkurl,'http://seo.chinaz.com',wt,sheet['B'+str(row)].value)
 
-        initweb(checkurl,'http://seo.chinaz.com',wt,sheet['B'+str(row)].value)
 
+
+
+################绘制表格
+#定义每个栏的规格 水平居中 垂直居中 自动换行
+align = Alignment(horizontal='center',vertical='center',wrap_text=True)
+medium = Side(border_style="medium", color="000000")
+border = Border(top=medium, left=medium, right=medium, bottom=medium)
+
+sheetnames=wt.sheetnames
+print (sheetnames)
+for sheetname in sheetnames:
+    sheet=wt[sheetname]
+    for row in sheet.rows:
+        for cell in row:
+            #sheet_nt[row].alignment = align
+            cell.border=border
+            cell.alignment=align
+            #cell.aligment=align
+        sheet.column_dimensions['B'].width=40.0
+        sheet.column_dimensions['A'].width=15.0
 
 wb.save(file_name)
 sheet=wt['Sheet']
